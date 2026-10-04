@@ -18,7 +18,7 @@ from pydantic import Field
 from typing_extensions import override
 
 from langchain.agents.factory import create_agent
-from langchain.agents.middleware._retry import calculate_delay
+from langchain.agents.middleware._retry import calculate_delay, should_retry_exception
 from langchain.agents.middleware.model_retry import ModelRetryMiddleware
 from langchain.agents.middleware.types import (
     ModelCallResult,
@@ -828,3 +828,15 @@ def test_model_retry_multiple_middleware_composition() -> None:
     ai_messages = [m for m in result["messages"] if isinstance(m, AIMessage)]
     assert len(ai_messages) >= 1
     assert "Hello" in ai_messages[-1].content
+
+
+def test_should_retry_exception_bare_class() -> None:
+    """Bare exception class should behave like a single-element tuple (see #41025)."""
+    # Matching exception -> retry
+    assert should_retry_exception(ValueError("x"), ValueError) is True
+    # Non-matching exception -> no retry (was truthy before fix)
+    assert should_retry_exception(KeyError("k"), ValueError) is False
+    # Tuple form still works
+    assert should_retry_exception(KeyError("k"), (ValueError,)) is False
+    assert should_retry_exception(ValueError("x"), (ValueError,)) is True
+
